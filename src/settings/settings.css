@@ -1,0 +1,29 @@
+body {
+    font-family: Arial, sans-serif;
+}
+
+#settings-form {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    padding: 10px;
+    max-width: 500px;
+}
+
+#settings-form label, 
+#settings-form input {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+#settings-form button {
+    width: 48%;
+    height: 30px;
+    margin-top: 10px;
+}
+
+@media screen and (max-width: 100px) {
+    #settings-form button {
+        width: 100%;
+    }
+}

@@ -1,0 +1,7 @@
+
+<plist version="1.0">
+<dict>
+  <key>NSSystemAdministrationUsageDescription</key>
+  <string>We need Full Disk Access to read certain files necessary for the app functionality.</string>
+</dict>
+</plist>

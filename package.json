@@ -1,0 +1,42 @@
+{
+  "name": "screentime-scraper",
+  "productName": "screentime-scraper",
+  "version": "1.0.0",
+  "description": "My Electron application description",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "echo \"No linting configured\"",
+    "clean": "rm -rf out/ dist/ build/ node_modules/"
+  },
+  "keywords": [],
+  "author": {
+    "name": "AV",
+    "email": "angel@viera.tech"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "abort-controller": "^3.0.0",
+    "aw-client": "^0.3.4",
+    "cross-fetch": "^4.0.0",
+    "date-fns": "^2.30.0",
+    "electron-log": "^5.0.0-beta.24",
+    "electron-squirrel-startup": "^1.0.0",
+    "electron-store": "^8.1.0",
+    "node-mac-permissions": "^2.3.0",
+    "os": "^0.1.2",
+    "sqlite3": "^5.1.6"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^6.2.1",
+    "@electron-forge/maker-deb": "^6.2.1",
+    "@electron-forge/maker-rpm": "^6.2.1",
+    "@electron-forge/maker-squirrel": "^6.2.1",
+    "@electron-forge/maker-zip": "^6.2.1",
+    "@electron-forge/plugin-auto-unpack-natives": "^6.2.1",
+    "electron": "25.3.1"
+  }
+}

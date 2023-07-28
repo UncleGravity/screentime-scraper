@@ -15,15 +15,17 @@ from aw_core.models import Event
 # Fetch browser usage from aw-watcher-web
 # Fetch vscode usage from aw-watcher-vscode
 # Uploads all data to personal server (not activitywatch related)
-# Upload Screen Time data to aw-server
+# Save Screen Time data to aw-server
+# Save iOS safari web usage to aw-server
 # TODO - Automate this script to run every 5 minutes
 # TODO - (OPTIONAL) Add macOS toolbar with status
-# TODO - Add support for safari web usage on iOS
 # TODO - Figure out how to read the hostname from the mac, currently null
 
 # API_ENDPOINT = "http://localhost:4564/screentime"
 API_ENDPOINT = "http://localhost:4564/test"
+last_to_time = None
 
+################################################
 # Utils
 
 # Prints the UTC offset in seconds
@@ -233,9 +235,10 @@ def save_ios_web_events_to_aw(from_time):
         events.append(entry)
 
     hostname = "CRISPR" # TODO: Hardcoded for now
+    # bucket = f"aw-watcher-web-android_aw-import-screentime_{device_id}"
     bucket = f"aw-screentime-import-web_{device_id}"
 
-    aw = ActivityWatchClient(client_name="aw-import-screentime")
+    aw = ActivityWatchClient(client_name="aw-import-screentime-web")
     aw.client_hostname = hostname
     aw.create_bucket(bucket, "web.tab.current")
     aw.insert_events(bucket, events)
@@ -250,6 +253,8 @@ def save_ios_events_to_aw(from_time):
         # Only send the "iPhone" substring is found in the model name (note that it could be null)
         if model_name is not None and "iPhone" in model_name:
             model_name = "iPhone"
+        else:
+            continue
 
         print(f"Saving {app_name} to ActivityWatch")
 
@@ -261,6 +266,7 @@ def save_ios_events_to_aw(from_time):
         events.append(entry)
 
     hostname = "CRISPR" # TODO: Hardcoded for now
+    # bucket = f"aw-watcher-android_aw-import-screentime_{device_id}"
     bucket = f"aw-screentime-import_{device_id}"
 
     aw = ActivityWatchClient(client_name="aw-import-screentime")
@@ -292,6 +298,9 @@ def fetch_screentime_events(from_time):
     data = read_screentime_from_disk(from_time)
     screen_time_data = []
 
+    name = 0
+    noname = 0
+
     for record in data:
         app_name, zsmd, device_id, model_name, usage, start_time, end_time, gmt_offset = record
         screen_time_entry = {
@@ -302,15 +311,52 @@ def fetch_screentime_events(from_time):
             'device_name': model_name,
             'gmt_offset': gmt_offset,
         }
+        if device_id is None:
+            noname += 1
+        else:
+            name += 1
+
         screen_time_data.append(screen_time_entry)
 
+    print(f"name: {name}, noname: {noname}")
     return screen_time_data
 
+from datetime import datetime, timedelta
+from collections import defaultdict
 
-if __name__ == "__main__":
+def get_app_pickups(data):
+    data = [d for d in data if 
+            d['time_start'].startswith('2023-07-28') and 
+            d['device_name'] and 'iPhone' in d['device_name']]
+
+    pickups = defaultdict(int)
+    prev_time_end = datetime.strptime(data[0]['time_end'], '%Y-%m-%dT%H:%M:%S+00:00')
+
+    for i in range(1, len(data)):
+        curr_time_start = datetime.strptime(data[i]['time_start'], '%Y-%m-%dT%H:%M:%S+00:00')
+
+        if (curr_time_start - prev_time_end) > timedelta(seconds=5):
+            # Check 2nd app opens within 5 seconds
+            if i+1 < len(data):
+                second_app_start = datetime.strptime(data[i+1]['time_start'], '%Y-%m-%dT%H:%M:%S+00:00')
+                if (second_app_start - curr_time_start) <= timedelta(seconds=2):
+                    pickups[data[i+1]['app_name']] += 1
+                    prev_time_end = datetime.strptime(data[i+1]['time_end'], '%Y-%m-%dT%H:%M:%S+00:00')
+                    continue  # Skip to next iteration
+
+            pickups[data[i]['app_name']] += 1    
+        prev_time_end = datetime.strptime(data[i]['time_end'], '%Y-%m-%dT%H:%M:%S+00:00')
+
+    return pickups
+
+def main():
+    last_to_time = None
     now = datetime.now(timezone.utc)
-    from_time = now - timedelta(days=1)
+    from_time = last_to_time if last_to_time else now - timedelta(days=15) # Use the last_to_time if available, otherwise use the past 24 hours
     to_time = now
+
+    # Save the current to_time for the next run
+    last_to_time = to_time
     
     ###########################
     # Save to ActivityWatch
@@ -338,15 +384,33 @@ if __name__ == "__main__":
         'host_gmt_offset': get_utc_offset() / 3600
     }
 
+    print(screentime_data)
+    # Call the function.
+    pickups = get_app_pickups(screentime_data)
+
+    # Print results
+    for app, count in pickups.items():
+        print(f"appname: {app}, pickups_triggered: {count}")
+
+
+    # print(json.dumps(combined_data, indent=4))
     # print(web_data)
-    # exit()
+    exit()
     # Upload data
     try:
         response = requests.post(API_ENDPOINT, json=combined_data)
-        print(json.dumps(combined_data, indent=4))
+        # print(json.dumps(combined_data, indent=4))
         if response.status_code == 200:
-            print('Data successfully sent to the server')
+            # Print success message with timestamp
+            print(f'{datetime.now().strftime("%Y-%m-%d %H:%M:%S")} | Server responded with: {response.text}')
         else:
             print(f'Error sending data to the server, status code: {response.status_code}')
     except requests.exceptions.RequestException as e:
         print(f'Error connecting to the server: {e}')
+
+if __name__ == "__main__":
+    while True:
+        main()
+        # delay for 1 minute
+        time.sleep(60*5)
+
