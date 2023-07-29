@@ -219,7 +219,7 @@ async function fetch_screentime_web_events(from_time) {
 async function sync(api_endpoint) {
 
   const now = new Date();
-  const days = 2;
+  const days = 3;  // Sync data from the last 3 days (because knoweldgeC.db isn't updated consistently)
   const from_time = last_to_time || addSeconds(now, -days * 24 * 60 * 60);
   const to_time = now;
   // last_to_time = to_time;
@@ -234,9 +234,9 @@ async function sync(api_endpoint) {
   const combined_data = {
     'screenTimeData': screentime_data,
     'screenTimeWebData': screentime_web_data,
-    'windowEventData': window_data,
-    'webEventData': web_data,
-    'vscodeEventData': vscode_data,
+    // 'windowEventData': window_data,
+    // 'webEventData': web_data,
+    // 'vscodeEventData': vscode_data,
     'host_gmt_offset': get_utc_offset(),
   };
 
