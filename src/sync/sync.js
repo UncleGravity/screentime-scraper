@@ -233,12 +233,14 @@ async function sync(api_endpoint) {
 
   const combined_data = {
     'screenTimeData': screentime_data,
-    // 'screenTimeWebData': screentime_web_data,
-    // 'windowEventData': window_data,
-    // 'webEventData': web_data,
-    // 'vscodeEventData': vscode_data,
-    // 'host_gmt_offset': get_utc_offset(),
+    'screenTimeWebData': screentime_web_data,
+    'windowEventData': window_data,
+    'webEventData': web_data,
+    'vscodeEventData': vscode_data,
+    'host_gmt_offset': get_utc_offset(),
   };
+
+  // await save_ios_events_to_aw(from_time);
 
   // console.log(combined_data)
   // console.log(screentime_data)
@@ -252,6 +254,7 @@ async function sync(api_endpoint) {
       method: 'POST',
       body: JSON.stringify(combined_data),
       headers: { 'Content-Type': 'application/json' },
+      timeout: 20000 // timeout after 20 seconds
     });
 
     if (response.ok) {
@@ -262,8 +265,12 @@ async function sync(api_endpoint) {
       return false;
     }
   } catch (error) {
-    console.log(`Error connecting to the server: ${error}`);
-    return false;
+    if (error instanceof TypeError) {
+      console.log('Request timed out'); 
+    } else {
+      console.log(`Error connecting to server: ${error}`);
+    }
+    return false; 
   }
 }
 

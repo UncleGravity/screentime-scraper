@@ -2,7 +2,7 @@ const { app, ipcMain, powerMonitor, Notification, Tray, Menu, BrowserWindow, nat
 const { ping, sync, test } = require('./sync/sync.js');
 const path = require('path');
 const fs = require('fs');
-const log = require('electron-log'); console.log = log.log;
+const log = require('electron-log'); console.log = log.log; // output location ~/Library/Logs/screentime-scraper/
 const Store = require('electron-store'); const store = new Store();
 const { askForFullDiskAccess } = require('node-mac-permissions')
 
@@ -16,18 +16,19 @@ let isQuiting = false;
 async function syncFunction() {
 
   console.log('Running syncFunction')
-  const syncEnabled = store.get('syncEnabled') || false;
-  if (!syncEnabled) { console.log("Sync Disabled. Not running."); return; }
+  // const syncEnabled = store.get('syncEnabled') || false;
+  // if (!syncEnabled) { console.log("Sync Disabled. Not running."); return; }
 
   const apiEndpoint = store.get('api1') || '';
 
   try {
-    await test(); result = false;
-    // let result = await sync(apiEndpoint);
+    // await test(); result = false;
+    const result = await sync(apiEndpoint);
 
     if (result) {
       store.set('lastSync', new Date());  // save lastSync to local storage
       console.log('Sync successful');
+      updateMenu();
       // Reset sync interval (in case we trigger sync manually)
       if (syncInterval) {
         console.log('Resetting sync interval');
@@ -37,35 +38,27 @@ async function syncFunction() {
       }
     } else {
       console.log('Sync failed');
-      new Notification({
-        title: "ScreenTime Scraper",
-        body: "Sync Failed"
-      }).show()
+      new Notification({ title: "ScreenTime Scraper", body: "Sync Failed" }).show()
     }
   } catch (e) {
-    new Notification({
-      title: "ScreenTime Scraper",
-      body: "Sync Error: " + e
-    }).show()
+    new Notification({ title: "ScreenTime Scraper", body: "Sync Error: " + e }).show()
   }
-
-  updateMenu();
-
 }
 
 function updateMenu() {
   const syncFrequency = store.get('syncFrequency') || 1;
   const syncEnabled = store.get('syncEnabled') || false;
   const lastSync = store.get('lastSync');
+  const lastSyncInLocalTZ = lastSync ? new Date(lastSync).toLocaleString() : null;
   const apiEndpoint = store.get('api1') || '';
 
   const contextMenu = Menu.buildFromTemplate([
     { label: 'Settings', click: createSettingsWindow },
     { label: apiEndpoint != '' ? 'Sync Now' : 'Sync Now (no endpoint)', click: syncFunction, enabled: (apiEndpoint != '') },
-    { label: `Last Sync: ${lastSync ? lastSync : 'Never'}`, enabled: false },
+    { label: `Last Sync: ${lastSyncInLocalTZ ? lastSyncInLocalTZ : 'Never'}`, enabled: false },
     { type: 'separator' },
     {
-      label: 'Frequency (minutes)', submenu: [
+      label: 'Frequency', submenu: [
         { label: '1 minute', type: 'radio', checked: syncFrequency === 1, click: () => updateSyncFrequency(1) },
         { label: '1 hour', type: 'radio', checked: syncFrequency === 60, click: () => updateSyncFrequency(60) },
         { label: '12 hours', type: 'radio', checked: syncFrequency === 12 * 60, click: () => updateSyncFrequency(12 * 60) },
@@ -117,28 +110,40 @@ function createSettingsWindow() {
   });
 }
 
-async function updateSyncFrequency(minutes) {
-  // Check if the sync interval has passed since the last sync (with the new frequency)
-  const lastSync = store.get('lastSync') || new Date();
+/* Runs the sync function if enough time has passed since the last sync.
+ * 
+ * @param {number} minutes - The sync frequency in minutes 
+*/
+async function runSyncIfNeeded(minutes) {
   const syncEnabled = store.get('syncEnabled') || false;
+  const lastSync = store.get('lastSync') || new Date(0);
   const now = new Date();
   const timeSinceLastSync = (now - lastSync) / 1000 / 60; // minutes
   if (timeSinceLastSync > minutes && syncEnabled) {
     await syncFunction();
   }
+}
 
-  // Update the sync frequency
-  store.set('syncFrequency', minutes);  // save frequency to local storage
-  clearInterval(syncInterval);
-  if (syncEnabled) {
-    syncInterval = setInterval(syncFunction, minutes * 60 * 1000);
+async function updateSyncFrequency(minutes) {
+  await runSyncIfNeeded(minutes);
+
+  try {
+    // Update the sync frequency
+    const syncEnabled = store.get('syncEnabled') || false;
+    store.set('syncFrequency', minutes);  // save frequency to local storage
+    clearInterval(syncInterval);
+    if (syncEnabled) {
+      syncInterval = setInterval(syncFunction, minutes * 60 * 1000);
+    }
+    updateMenu();
+  } catch (e) {
+    new Notification({ title: "ScreenTime Scraper", body: e }).show()
   }
-  updateMenu();
 }
 
 async function setAutoSyncState(state) {
 
-  if (store.get('syncEnabled') == state) {
+  if (store.get('syncEnabled') === state) {
     console.log('Sync state is already set to', state);
     return;
   }
@@ -162,7 +167,7 @@ async function setAutoSyncState(state) {
 ////////////////////////////////////////////////////////
 ipcMain.on('update-api-values', (event, { api1 }) => {
   store.set('api1', api1);
-  if (api1 == '') {
+  if (api1 === '') {
     setAutoSyncState(false);
   }
   updateMenu();
@@ -184,11 +189,14 @@ app.on('before-quit', function () {
 
 powerMonitor.on('resume', async () => {
   console.log('Restarting sync after sleep');
-  syncFrequency = store.get('syncFrequency') || 1;
-  await updateSyncFrequency(syncFrequency);
+  const minutes = store.get('syncFrequency') || 1;
+  await runSyncIfNeeded(minutes);
 });
 
 app.whenReady().then(async () => {
+
+  // store.clear(); // clear local storage on app start
+
   if (app.dock) {
     app.dock.hide();
   }
@@ -207,7 +215,6 @@ app.whenReady().then(async () => {
   try {
     fs.accessSync(filePath, fs.constants.R_OK);
     console.log(`Access to ${filePath} granted!`)
-    updateMenu();
     await initialize();
 
   } catch (err) {
@@ -224,9 +231,9 @@ app.whenReady().then(async () => {
 })
 
 async function initialize() {
-  // await syncFunction();
-  syncFrequency = store.get('syncFrequency') || 1; // in minutes
-  await updateSyncFrequency(syncFrequency);
+  const syncFrequency = store.get('syncFrequency') || 1; // in minutes
+  await runSyncIfNeeded(syncFrequency);
+  updateMenu();
 }
 
 // Notes:
