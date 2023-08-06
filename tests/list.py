@@ -3,7 +3,7 @@ import sqlite3
 from datetime import datetime
 from os.path import expanduser
 
-def format_value(value, default="BENGKUI"):
+def format_value(value, default="UNKNOWN"):
     """Helper function to handle None values."""
     return default if value is None else value
 

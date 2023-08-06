@@ -4,6 +4,23 @@ macOS saves ScreenTime data for all your iCloud enabled devices inside of a loca
 ### Note
 This code kinda sucks and should not be used by anyone for any reason.
 
+## Quick Start
+If you just want to see what your raw ScreenTime data looks like, you can run the following command in your terminal. This will fetch the data from knowledgeC.db and print it to the console.
+```bash
+cd tests
+pip install -r requirements.txt
+python list.py
+```
+
+and this will make a simple chart of your daily usage
+```bash
+python segmentplot2.py
+```
+![Example of basic app usage visualization](assets/basic-usage.png)
+
+For a more advanced use case, this is an example dashboard I built in grafana:
+![grafana usage viz](assets/grafana-usage.png)
+
 ## Overview
 The ScreenTime Scraper app has the following features:
 - Fetches usage data from the knowledgeC.db SQLite database on macOS
@@ -13,7 +30,7 @@ The ScreenTime Scraper app has the following features:
 - Includes menu bar app and preference pane for configuration
 
 ## Installation
-Download the latest release from the [releases page](https://github.com/yourusername/screentime-scraper/releases).
+TODO: Add a packaged binary to the releases page.
 
 ## Development
 
